@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restaurant Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .chat-container {
+            width: 90%;
+            max-width: 500px;
+            height: 80vh;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #4a3f9e;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .chat-box {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+        }
+        .message-row {
+            display: flex;
+            width: 100%;
+            margin: 5px 0;
+        }
+        .user-message-row {
+            justify-content: flex-end;
+        }
+        .bot-message-row {
+            justify-content: flex-start;
+        }
+        .message-content {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+        }
+        .user-message-content {
+            align-items: flex-end;
+        }
+        .bot-message-content {
+            align-items: flex-start;
+        }
+        .message {
+            padding: 10px 14px;
+            border-radius: 15px;
+            animation: fadeIn 0.3s ease-in;
+            word-wrap: break-word;
+            display: inline-block;
+        }
+        .user-message {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+        .bot-message {
+            background: #e0e0e0;
+            color: black;
+            border-bottom-left-radius: 2px;
+        }
+        .timestamp {
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .delivered-indicator {
+            font-size: 10px;
+            color: #fff;
+            margin-top: 4px;
+            padding-right: 5px;
+            align-self: flex-end;
+        }
+        .chat-input {
+            display: flex;
+            border-top: 1px solid #ddd;
+            flex-shrink: 0;
+        }
+        .chat-input input {
+            flex: 1;
+            border: none;
+            padding: 15px;
+            font-size: 16px;
+            outline: none;
+        }
+        .chat-input button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .chat-input button:hover {
+            background: #4a3f9e;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            margin: 0 2px;
+            background-color: #999;
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: typing 1s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% {
+                transform: translateY(-5px);
+                background-color: #667eea;
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">💬 Restaurant Chatbot</div>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="chat-input">
+            <input type="text" id="user-input" placeholder="Type your message..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://172.16.2.128:8002/ask";
+        const sessionId = Date.now().toString();
+
+        function addMessage(text, sender) {
+            const chatBox = document.getElementById("chat-box");
+            
+            const messageRow = document.createElement("div");
+            messageRow.classList.add("message-row", sender === "user" ? "user-message-row" : "bot-message-row");
+
+            const messageContent = document.createElement("div");
+            messageContent.classList.add("message-content", sender === "user" ? "user-message-content" : "bot-message-content");
+
+            const message = document.createElement("div");
+            message.classList.add("message", sender === "user" ? "user-message" : "bot-message");
+
+            if (text === "typing") {
+                message.innerHTML = `
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                `;
+                message.id = "typing-indicator";
+            } else {
+                message.innerHTML = formatMessage(text);
+            }
+
+            messageContent.appendChild(message);
+
+            if (text !== "typing") {
+                const timestamp = document.createElement("span");
+                timestamp.classList.add("timestamp");
+                timestamp.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                messageContent.appendChild(timestamp);
+
+                if (sender === "user") {
+                    const delivered = document.createElement("span");
+                    delivered.classList.add("delivered-indicator");
+                    delivered.textContent = "Delivered ✓";
+                    messageContent.appendChild(delivered);
+                }
+            }
+
+            messageRow.appendChild(messageContent);
+            chatBox.appendChild(messageRow);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById("typing-indicator");
+            if (indicator) {
+                indicator.parentElement.parentElement.remove();
+            }
+        }
+
+        function formatMessage(text) {
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            return formattedText;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("user-input");
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage(text, "user");
+            input.value = "";
+            input.disabled = true;
+            
+            addMessage("typing", "bot");
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: text, session_id: sessionId })
+                });
+
+                removeTypingIndicator();
+                input.disabled = false;
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        addMessage("We're having trouble reaching the server. Please check the URL.", "bot");
+                    } else if (response.status === 500) {
+                        addMessage("Oops! Something went wrong on our end. Please try again later.", "bot");
+                    } else {
+                        addMessage(`An error occurred: Status ${response.status}. Please try again.`, "bot");
+                    }
+                    return;
+                }
+
+                const data = await response.json();
+                addMessage(data.answer, "bot");
+            } catch (err) {
+                removeTypingIndicator();
+                input.disabled = false;
+                addMessage("Failed to connect to the server. Please check your network connection.", "bot");
+            }
+        }
+
+        window.onload = () => {
+            addMessage("👋 Hello! Ask me anything about our restaurant.", "bot");
+        };
+    </script>
+</body>
+</html>
